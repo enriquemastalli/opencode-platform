@@ -20,12 +20,16 @@ services:
       dockerfile: Dockerfile
     container_name: opencode-panel
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - PANEL_PORT=3000
       - WORKSPACES_DIR=/workspaces
       - OPENCODE_IMAGE=opencode-platform-opencode
-      - OPENCODE_BASE_PORT=4100
-      - MAX_PROJECTS=20
+      - OPENCODE_BASE_PORT=${OPENCODE_BASE_PORT:-4100}
+      - MAX_PROJECTS=${MAX_PROJECTS:-20}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_ORG=${GITHUB_ORG:-essentia-uy}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - workspaces:/workspaces
