@@ -532,7 +532,7 @@
         <span>Opciones avanzadas</span>
         <span id="advanced-arrow">▸</span>
       </button>
-      <div id="advanced-section" class="hidden" style="margin-top:12px;display:flex;flex-direction:column;gap:16px">
+      <div id="advanced-section" style="margin-top:12px;display:none;flex-direction:column;gap:16px">
         <div class="form-group">
           <label>Repositorio existente <span style="font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span></label>
           <input type="text" id="input-repo" placeholder="https://github.com/org/repo.git" autocomplete="off" />
@@ -742,8 +742,9 @@
   function toggleAdvanced() {
     const section = document.getElementById('advanced-section')
     const arrow = document.getElementById('advanced-arrow')
-    const hidden = section.classList.toggle('hidden')
-    arrow.textContent = hidden ? '▸' : '▾'
+    const isHidden = section.style.display === 'none' || section.style.display === ''
+    section.style.display = isHidden ? 'flex' : 'none'
+    arrow.textContent = isHidden ? '▾' : '▸'
   }
 
   function closeNewProjectModal() {
@@ -754,7 +755,7 @@
     document.getElementById('input-creator').value = ''
     document.getElementById('input-anthropic-key').value = ''
     document.getElementById('api-keys-list').innerHTML = ''
-    document.getElementById('advanced-section').classList.add('hidden')
+    document.getElementById('advanced-section').style.display = 'none'
     document.getElementById('advanced-arrow').textContent = '▸'
     apiKeyCount = 0
   }
