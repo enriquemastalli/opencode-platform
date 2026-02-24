@@ -2,8 +2,11 @@
 set -euo pipefail
 
 # ── OpenCode Platform — Script de instalación para VPS Ubuntu 24.04 ──────────
-# Uso: bash install.sh
+# Uso one-liner:
+#   bash <(curl -fsSL https://raw.githubusercontent.com/enriquemastalli/opencode-platform/main/scripts/install.sh)
 # Requiere: Ubuntu 24.04, acceso root/sudo, CLOUDFLARE_TUNNEL_TOKEN configurado
+
+REPO_URL="https://github.com/enriquemastalli/opencode-platform.git"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -27,7 +30,7 @@ echo ""
 
 # ── 1. Verificar root ─────────────────────────────────────────────────────────
 if [[ $EUID -ne 0 ]]; then
-  err "Ejecutar como root: sudo bash install.sh"
+  err "Ejecutar como root: sudo bash <(curl -fsSL https://raw.githubusercontent.com/enriquemastalli/opencode-platform/main/scripts/install.sh)"
 fi
 
 # ── 2. Actualizar sistema ─────────────────────────────────────────────────────
@@ -72,18 +75,14 @@ chown -R opencode:opencode "$INSTALL_DIR"
 chown -R opencode:opencode "$WORKSPACES_DIR"
 log "Directorios: $INSTALL_DIR y $WORKSPACES_DIR"
 
-# ── 6. Copiar archivos del proyecto ───────────────────────────────────────────
-info "Copiando archivos de la plataforma..."
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-
-if [[ -z "$PROJECT_ROOT" || ! -f "$PROJECT_ROOT/docker-compose.yml" ]]; then
-  err "No se encontraron los archivos del proyecto en '$PROJECT_ROOT'.\nEjecuta el script desde dentro del repositorio clonado:\n  git clone <repo> && cd opencode-platform && sudo bash scripts/install.sh"
-fi
-
-cp -r "$PROJECT_ROOT"/{docker-compose.yml,traefik,panel,opencode} "$INSTALL_DIR/"
+# ── 6. Clonar repositorio ─────────────────────────────────────────────────────
+info "Clonando repositorio..."
+CLONE_DIR="$(mktemp -d)"
+git clone --depth=1 "$REPO_URL" "$CLONE_DIR"
+cp -r "$CLONE_DIR"/{docker-compose.yml,traefik,panel,opencode} "$INSTALL_DIR/"
+rm -rf "$CLONE_DIR"
 chown -R opencode:opencode "$INSTALL_DIR"
-log "Archivos copiados a $INSTALL_DIR"
+log "Archivos instalados en $INSTALL_DIR"
 
 # ── 7. Configurar .env ────────────────────────────────────────────────────────
 ENV_FILE="$INSTALL_DIR/.env"
