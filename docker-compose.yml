@@ -1,0 +1,70 @@
+services:
+
+  # ── Traefik — reverse proxy interno ────────────────────────────────────────
+  traefik:
+    image: traefik:v3.2
+    container_name: traefik
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+    ports:
+      - "80:80"
+    networks:
+      - opencode-net
+
+  # ── Panel de gestión ────────────────────────────────────────────────────────
+  panel:
+    build:
+      context: ./panel
+      dockerfile: Dockerfile
+    container_name: opencode-panel
+    restart: unless-stopped
+    environment:
+      - PANEL_PORT=3000
+      - WORKSPACES_DIR=/workspaces
+      - OPENCODE_IMAGE=opencode-platform-opencode
+      - OPENCODE_BASE_PORT=4100
+      - MAX_PROJECTS=20
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - workspaces:/workspaces
+    networks:
+      - opencode-net
+    labels:
+      - "traefik.enable=true"
+      # El panel responde en la raíz "/"
+      - "traefik.http.routers.panel.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.panel.entrypoints=web"
+      - "traefik.http.routers.panel.priority=1"
+      - "traefik.http.services.panel.loadbalancer.server.port=3000"
+
+  # ── Cloudflare Tunnel ───────────────────────────────────────────────────────
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - opencode-net
+    depends_on:
+      - traefik
+
+# ── Los contenedores de proyectos los crea el panel dinámicamente ──
+# Deben estar en la red "opencode-net" y tener labels de Traefik.
+# El panel server.js los configura al crearlos.
+
+networks:
+  opencode-net:
+    name: opencode-net
+    driver: bridge
+
+volumes:
+  workspaces:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /workspaces

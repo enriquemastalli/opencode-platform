@@ -1,0 +1,19 @@
+api:
+  dashboard: false
+
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    exposedByDefault: false
+    network: opencode-net
+
+log:
+  level: INFO
+
+# Sin certificados propios — Cloudflare Tunnel maneja TLS externamente
+# Traefik solo escucha HTTP internamente

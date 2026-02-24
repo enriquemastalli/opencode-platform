@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenCode Platform</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0d;
+      --surface: #161616;
+      --surface-2: #1f1f1f;
+      --border: #2a2a2a;
+      --text: #e8e8e8;
+      --text-muted: #6b6b6b;
+      --accent: #ffffff;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --blue: #3b82f6;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ── */
+    .layout { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 20px 0;
+    }
+
+    .sidebar-logo {
+      padding: 0 20px 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+
+    .sidebar-logo h1 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: -0.3px;
+    }
+
+    .sidebar-logo span {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 20px;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 13px;
+      border-radius: 0;
+      transition: color 0.15s;
+    }
+
+    .nav-item:hover { color: var(--text); }
+    .nav-item.active { color: var(--accent); background: var(--surface-2); }
+
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .topbar {
+      height: 52px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      background: var(--surface);
+    }
+
+    .topbar-title { font-size: 14px; font-weight: 500; }
+
+    .content { flex: 1; padding: 24px; overflow-y: auto; }
+
+    /* ── Botones ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-primary { background: var(--accent); color: #000; border-color: var(--accent); }
+    .btn-ghost { background: transparent; color: var(--text-muted); border-color: var(--border); }
+    .btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
+    .btn-danger { background: transparent; color: var(--red); border-color: var(--red); }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+    /* ── Cards de proyecto ── */
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+
+    .project-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .project-card:hover { border-color: #3a3a3a; }
+
+    .project-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .project-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+      font-family: var(--mono);
+    }
+
+    .project-repo {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+
+    .badge-green { background: rgba(34,197,94,0.12); color: var(--green); }
+    .badge-red   { background: rgba(239,68,68,0.12);  color: var(--red); }
+    .badge-yellow{ background: rgba(234,179,8,0.12);  color: var(--yellow); }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .project-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .project-url {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--blue);
+      background: var(--surface-2);
+      padding: 6px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .project-url span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .copy-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+      font-size: 12px;
+    }
+    .copy-btn:hover { color: var(--text); }
+
+    .project-actions { display: flex; gap: 8px; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 24px;
+      text-align: center;
+      gap: 12px;
+      color: var(--text-muted);
+    }
+
+    .empty-state svg { opacity: 0.3; }
+    .empty-state h3 { font-size: 16px; color: var(--text); }
+    .empty-state p { font-size: 13px; max-width: 320px; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .modal h2 { font-size: 16px; font-weight: 600; }
+
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+
+    .form-group label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-group input, .form-group textarea {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 13px;
+      color: var(--text);
+      font-family: var(--font);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .form-group input:focus, .form-group textarea:focus {
+      border-color: #4a4a4a;
+    }
+
+    .form-group textarea { resize: vertical; min-height: 80px; font-family: var(--mono); font-size: 12px; }
+
+    .form-hint { font-size: 11px; color: var(--text-muted); }
+
+    .api-keys-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .api-key-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .api-key-row input {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      color: var(--text);
+      font-family: var(--mono);
+      outline: none;
+    }
+
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+    /* ── Logs modal ── */
+    .logs-content {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* ── Toasts ── */
+    .toast-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 200;
+    }
+
+    .toast {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-size: 13px;
+      min-width: 220px;
+      animation: slideIn 0.2s ease;
+    }
+
+    .toast.success { border-left: 3px solid var(--green); }
+    .toast.error   { border-left: 3px solid var(--red); }
+
+    @keyframes slideIn {
+      from { transform: translateX(20px); opacity: 0; }
+      to   { transform: translateX(0); opacity: 1; }
+    }
+
+    /* ── Loading ── */
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h1>OpenCode</h1>
+      <span>Platform</span>
+    </div>
+    <div class="nav-item active" onclick="showView('projects')">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      Proyectos
+    </div>
+    <div class="nav-item" onclick="showView('attach')">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      Conectar TUI
+    </div>
+  </aside>
+
+  <div class="main">
+    <!-- Topbar -->
+    <div class="topbar">
+      <span class="topbar-title" id="view-title">Proyectos</span>
+      <button class="btn btn-primary" id="btn-new-project" onclick="openNewProjectModal()">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        Nuevo proyecto
+      </button>
+    </div>
+
+    <!-- Vista: Proyectos -->
+    <div class="content" id="view-projects">
+      <div id="projects-loading" style="display:flex;align-items:center;gap:10px;color:var(--text-muted)">
+        <div class="spinner"></div> Cargando proyectos...
+      </div>
+      <div id="projects-empty" class="empty-state hidden">
+        <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        <h3>Sin proyectos todavía</h3>
+        <p>Creá tu primer proyecto con el botón de arriba. Solo necesitás el nombre y la URL del repositorio.</p>
+      </div>
+      <div id="projects-grid" class="projects-grid hidden"></div>
+    </div>
+
+    <!-- Vista: Conectar TUI -->
+    <div class="content hidden" id="view-attach">
+      <div style="max-width:560px">
+        <h2 style="font-size:15px;margin-bottom:16px">Conectar OpenCode Desktop a un proyecto</h2>
+        <p style="color:var(--text-muted);font-size:13px;margin-bottom:20px;line-height:1.6">
+          Podés usar el TUI completo de OpenCode conectado a cualquier proyecto que esté corriendo en el servidor. 
+          Desde tu máquina local, ejecutá el siguiente comando reemplazando <code style="background:var(--surface-2);padding:1px 5px;border-radius:3px;font-family:var(--mono)">&lt;proyecto&gt;</code> 
+          con el nombre del proyecto.
+        </p>
+        <div id="attach-projects-list" style="display:flex;flex-direction:column;gap:10px"></div>
+        <p id="attach-empty" class="hidden" style="color:var(--text-muted);font-size:13px">
+          No hay proyectos activos en este momento.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Nuevo proyecto -->
+<div class="modal-overlay hidden" id="modal-new-project">
+  <div class="modal">
+    <h2>Nuevo proyecto</h2>
+
+    <div class="form-group">
+      <label>Nombre del proyecto</label>
+      <input type="text" id="input-name" placeholder="mi-proyecto" autocomplete="off" />
+      <span class="form-hint">Solo letras minúsculas, números y guiones.</span>
+    </div>
+
+    <div class="form-group">
+      <label>URL del repositorio</label>
+      <input type="text" id="input-repo" placeholder="https://github.com/org/repo.git" autocomplete="off" />
+    </div>
+
+    <div class="form-group">
+      <label>Tu nombre (opcional)</label>
+      <input type="text" id="input-creator" placeholder="Juan García" autocomplete="off" />
+    </div>
+
+    <div class="form-group">
+      <label>API Keys</label>
+      <span class="form-hint" style="margin-bottom:6px">Se guardan en el servidor solo para este proyecto. Agregá las que necesites.</span>
+      <div class="api-keys-section" id="api-keys-list">
+        <!-- filas dinámicas -->
+      </div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:6px;align-self:flex-start" onclick="addApiKeyRow()">
+        + Agregar key
+      </button>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeNewProjectModal()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-create" onclick="createProject()">
+        Crear proyecto
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Logs -->
+<div class="modal-overlay hidden" id="modal-logs">
+  <div class="modal" style="max-width:640px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 id="logs-title">Logs</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeLogs()">Cerrar</button>
+    </div>
+    <div class="logs-content" id="logs-content">Cargando...</div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div class="toast-container" id="toasts"></div>
+
+<script>
+  // ── Estado ──────────────────────────────────────────────────────────────────
+  let projects = []
+  let apiKeyCount = 0
+
+  const TUNNEL_URL = window.location.origin // La URL pública del tunnel
+
+  // ── Init ────────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    loadProjects()
+    // Refrescar cada 30s
+    setInterval(loadProjects, 30000)
+    addApiKeyRow() // Fila inicial de API key
+  })
+
+  // ── Vistas ──────────────────────────────────────────────────────────────────
+  function showView(name) {
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'))
+    event.currentTarget.classList.add('active')
+
+    document.getElementById('view-projects').classList.toggle('hidden', name !== 'projects')
+    document.getElementById('view-attach').classList.toggle('hidden', name !== 'attach')
+    document.getElementById('btn-new-project').classList.toggle('hidden', name !== 'projects')
+    document.getElementById('view-title').textContent = name === 'projects' ? 'Proyectos' : 'Conectar TUI'
+
+    if (name === 'attach') renderAttachView()
+  }
+
+  // ── Cargar proyectos ────────────────────────────────────────────────────────
+  async function loadProjects() {
+    try {
+      const res = await fetch('/api/projects')
+      projects = await res.json()
+      renderProjects()
+    } catch (err) {
+      toast('Error cargando proyectos', 'error')
+    }
+  }
+
+  function renderProjects() {
+    const loading = document.getElementById('projects-loading')
+    const empty   = document.getElementById('projects-empty')
+    const grid    = document.getElementById('projects-grid')
+
+    loading.classList.add('hidden')
+
+    if (projects.length === 0) {
+      empty.classList.remove('hidden')
+      grid.classList.add('hidden')
+      return
+    }
+
+    empty.classList.add('hidden')
+    grid.classList.remove('hidden')
+
+    grid.innerHTML = projects.map(p => {
+      const statusBadge = p.running
+        ? `<span class="badge badge-green"><span class="dot"></span>Activo</span>`
+        : `<span class="badge badge-red"><span class="dot"></span>Detenido</span>`
+
+      const projectUrl = p.running && p.port
+        ? `${TUNNEL_URL}/p/${p.name}/`
+        : null
+
+      const urlRow = projectUrl
+        ? `<div class="project-url">
+            <span>${projectUrl}</span>
+            <button class="copy-btn" title="Copiar URL" onclick="copyText('${projectUrl}')">⎘</button>
+          </div>`
+        : ''
+
+      const attachCmd = p.running && p.port
+        ? `opencode attach ${projectUrl}`
+        : null
+
+      const attachRow = attachCmd
+        ? `<div class="project-url" style="color:var(--text-muted)">
+            <span>${attachCmd}</span>
+            <button class="copy-btn" title="Copiar comando" onclick="copyText('${attachCmd}')">⎘</button>
+          </div>`
+        : ''
+
+      const createdAt = p.createdAt
+        ? new Date(p.createdAt).toLocaleDateString('es-AR', { day:'2-digit', month:'short', year:'numeric' })
+        : 'Desconocido'
+
+      return `
+        <div class="project-card" id="card-${p.name}">
+          <div class="project-header">
+            <div>
+              <div class="project-name">${p.name}</div>
+              <div class="project-repo">${p.repo || 'Sin repositorio'}</div>
+            </div>
+            ${statusBadge}
+          </div>
+
+          ${urlRow}
+          ${attachRow}
+
+          <div class="project-meta">
+            <span>Creado: ${createdAt}${p.createdBy ? ' por ' + p.createdBy : ''}</span>
+          </div>
+
+          <div class="project-actions">
+            ${p.running
+              ? `<button class="btn btn-ghost btn-sm" onclick="stopProject('${p.name}')">Detener</button>`
+              : `<button class="btn btn-ghost btn-sm" onclick="startProject('${p.name}')">Iniciar</button>`
+            }
+            <button class="btn btn-ghost btn-sm" onclick="viewLogs('${p.name}')">Logs</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteProject('${p.name}')">Eliminar</button>
+          </div>
+        </div>
+      `
+    }).join('')
+  }
+
+  // ── Vista Attach ─────────────────────────────────────────────────────────────
+  function renderAttachView() {
+    const list  = document.getElementById('attach-projects-list')
+    const empty = document.getElementById('attach-empty')
+    const active = projects.filter(p => p.running)
+
+    if (active.length === 0) {
+      list.innerHTML = ''
+      empty.classList.remove('hidden')
+      return
+    }
+
+    empty.classList.add('hidden')
+    list.innerHTML = active.map(p => {
+      const url = `${TUNNEL_URL}/p/${p.name}/`
+      const cmd = `opencode attach ${url}`
+      return `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:10px">
+          <div style="font-weight:600;font-family:var(--mono);color:var(--accent)">${p.name}</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Comando para conectar</span>
+            <div class="project-url">
+              <span>${cmd}</span>
+              <button class="copy-btn" title="Copiar" onclick="copyText('${cmd}')">⎘</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Abrir en browser</span>
+            <div class="project-url">
+              <span>${url}</span>
+              <button class="copy-btn" title="Copiar" onclick="copyText('${url}')">⎘</button>
+            </div>
+          </div>
+        </div>
+      `
+    }).join('')
+  }
+
+  // ── Nuevo proyecto modal ─────────────────────────────────────────────────────
+  function openNewProjectModal() {
+    document.getElementById('modal-new-project').classList.remove('hidden')
+    document.getElementById('input-name').focus()
+  }
+
+  function closeNewProjectModal() {
+    document.getElementById('modal-new-project').classList.add('hidden')
+    document.getElementById('input-name').value = ''
+    document.getElementById('input-repo').value = ''
+    document.getElementById('input-creator').value = ''
+    document.getElementById('api-keys-list').innerHTML = ''
+    apiKeyCount = 0
+    addApiKeyRow()
+  }
+
+  function addApiKeyRow() {
+    const list = document.getElementById('api-keys-list')
+    const id = ++apiKeyCount
+    const row = document.createElement('div')
+    row.className = 'api-key-row'
+    row.id = `key-row-${id}`
+    row.innerHTML = `
+      <input type="text" placeholder="ANTHROPIC_API_KEY" data-type="key" />
+      <input type="password" placeholder="sk-ant-..." data-type="value" />
+      <button class="btn btn-ghost btn-sm" onclick="removeApiKeyRow(${id})" style="padding:4px 8px">✕</button>
+    `
+    list.appendChild(row)
+  }
+
+  function removeApiKeyRow(id) {
+    const row = document.getElementById(`key-row-${id}`)
+    if (row) row.remove()
+  }
+
+  function collectApiKeys() {
+    const rows = document.querySelectorAll('#api-keys-list .api-key-row')
+    const keys = {}
+    rows.forEach(row => {
+      const k = row.querySelector('[data-type="key"]').value.trim()
+      const v = row.querySelector('[data-type="value"]').value.trim()
+      if (k && v) keys[k] = v
+    })
+    return keys
+  }
+
+  async function createProject() {
+    const name      = document.getElementById('input-name').value.trim()
+    const repo      = document.getElementById('input-repo').value.trim()
+    const createdBy = document.getElementById('input-creator').value.trim()
+    const apiKeys   = collectApiKeys()
+
+    if (!name) return toast('El nombre es obligatorio', 'error')
+    if (!repo)  return toast('La URL del repositorio es obligatoria', 'error')
+
+    const btn = document.getElementById('btn-create')
+    btn.disabled = true
+    btn.innerHTML = '<div class="spinner"></div> Creando...'
+
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, repo, apiKeys, createdBy })
+      })
+      const data = await res.json()
+
+      if (!res.ok) throw new Error(data.error || 'Error desconocido')
+
+      toast(`Proyecto "${data.name}" creado y corriendo en puerto ${data.port}`, 'success')
+      closeNewProjectModal()
+      await loadProjects()
+    } catch (err) {
+      toast(err.message, 'error')
+    } finally {
+      btn.disabled = false
+      btn.textContent = 'Crear proyecto'
+    }
+  }
+
+  // ── Acciones de proyecto ─────────────────────────────────────────────────────
+  async function startProject(name) {
+    try {
+      const res = await fetch(`/api/projects/${name}/start`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast(`Proyecto "${name}" iniciado`, 'success')
+      await loadProjects()
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
+  async function stopProject(name) {
+    try {
+      const res = await fetch(`/api/projects/${name}/stop`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast(`Proyecto "${name}" detenido`, 'success')
+      await loadProjects()
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
+  async function deleteProject(name) {
+    if (!confirm(`¿Eliminar el proyecto "${name}"?\n\nEsto borrará el workspace del servidor. El repositorio remoto no se toca.`)) return
+    try {
+      const res = await fetch(`/api/projects/${name}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast(`Proyecto "${name}" eliminado`, 'success')
+      await loadProjects()
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
+  async function viewLogs(name) {
+    document.getElementById('logs-title').textContent = `Logs — ${name}`
+    document.getElementById('logs-content').textContent = 'Cargando...'
+    document.getElementById('modal-logs').classList.remove('hidden')
+    try {
+      const res = await fetch(`/api/projects/${name}/logs?lines=100`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      document.getElementById('logs-content').textContent = data.logs || '(sin logs)'
+    } catch (err) {
+      document.getElementById('logs-content').textContent = `Error: ${err.message}`
+    }
+  }
+
+  function closeLogs() {
+    document.getElementById('modal-logs').classList.add('hidden')
+  }
+
+  // ── Utils ────────────────────────────────────────────────────────────────────
+  function copyText(text) {
+    navigator.clipboard.writeText(text).then(() => toast('Copiado al portapapeles', 'success'))
+  }
+
+  function toast(message, type = 'success') {
+    const container = document.getElementById('toasts')
+    const el = document.createElement('div')
+    el.className = `toast ${type}`
+    el.textContent = message
+    container.appendChild(el)
+    setTimeout(() => el.remove(), 3500)
+  }
+
+  // Cerrar modales con Escape
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeNewProjectModal()
+      closeLogs()
+    }
+  })
+</script>
+</body>
+</html>
