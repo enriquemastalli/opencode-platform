@@ -397,9 +397,11 @@
       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
       Proyectos
     </div>
-    <div class="nav-item" onclick="showView('attach')">
-      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-      Conectar TUI
+    <div style="margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)">
+      <a href="/cdn-cgi/access/logout" style="display:flex;align-items:center;gap:8px;color:var(--text-muted);font-size:12px;text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Cerrar sesión
+      </a>
     </div>
   </aside>
 
@@ -426,21 +428,6 @@
       <div id="projects-grid" class="projects-grid hidden"></div>
     </div>
 
-    <!-- Vista: Conectar TUI -->
-    <div class="content hidden" id="view-attach">
-      <div style="max-width:560px">
-        <h2 style="font-size:15px;margin-bottom:16px">Conectar OpenCode Desktop a un proyecto</h2>
-        <p style="color:var(--text-muted);font-size:13px;margin-bottom:20px;line-height:1.6">
-          Podés usar el TUI completo de OpenCode conectado a cualquier proyecto que esté corriendo en el servidor. 
-          Desde tu máquina local, ejecutá el siguiente comando reemplazando <code style="background:var(--surface-2);padding:1px 5px;border-radius:3px;font-family:var(--mono)">&lt;proyecto&gt;</code> 
-          con el nombre del proyecto.
-        </p>
-        <div id="attach-projects-list" style="display:flex;flex-direction:column;gap:10px"></div>
-        <p id="attach-empty" class="hidden" style="color:var(--text-muted);font-size:13px">
-          No hay proyectos activos en este momento.
-        </p>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -452,37 +439,49 @@
     <div class="form-group">
       <label>Nombre del proyecto</label>
       <input type="text" id="input-name" placeholder="mi-proyecto" autocomplete="off" />
-      <span class="form-hint">Un nombre corto para identificar este proyecto. Solo letras minúsculas, números y guiones. Ejemplo: <code style="background:var(--surface-2);padding:1px 4px;border-radius:3px;font-family:var(--mono)">essentia-web</code></span>
+      <span class="form-hint">Un nombre corto para identificar el proyecto. Solo letras minúsculas, números y guiones.</span>
     </div>
 
     <div class="form-group">
-      <label>URL del repositorio</label>
-      <input type="text" id="input-repo" placeholder="https://github.com/org/repo.git" autocomplete="off" />
-      <span class="form-hint">La URL del repositorio de código que querés abrir con OpenCode. Tiene que ser público o usar un token de acceso.</span>
+      <label>Descripción <span style="font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span></label>
+      <input type="text" id="input-description" placeholder="¿Para qué es este proyecto?" autocomplete="off" />
     </div>
 
     <div class="form-group">
-      <label>Tu nombre (opcional)</label>
+      <label>Tu nombre <span style="font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span></label>
       <input type="text" id="input-creator" placeholder="Juan García" autocomplete="off" />
-      <span class="form-hint">Para saber quién creó el proyecto. No afecta el funcionamiento.</span>
     </div>
 
     <div class="form-group">
-      <label>API Keys del agente de IA</label>
-      <span class="form-hint" style="margin-bottom:6px">Las claves que OpenCode va a usar para conectarse a los modelos de IA (Anthropic, OpenAI, etc). Se guardan de forma segura en el servidor y solo se usan para este proyecto.</span>
-      <div class="api-keys-section" id="api-keys-list">
-        <!-- filas dinámicas -->
-      </div>
-      <button class="btn btn-ghost btn-sm" style="margin-top:6px;align-self:flex-start" onclick="addApiKeyRow()">
-        + Agregar key
+      <label>API Key de Anthropic</label>
+      <input type="password" id="input-anthropic-key" placeholder="sk-ant-..." autocomplete="off" />
+      <span class="form-hint">Tu clave de Anthropic para usar Claude. Se guarda de forma segura en el servidor.</span>
+    </div>
+
+    <!-- Modo avanzado -->
+    <div>
+      <button class="btn btn-ghost btn-sm" onclick="toggleAdvanced()" id="btn-advanced" style="width:100%;justify-content:space-between">
+        <span>Opciones avanzadas</span>
+        <span id="advanced-arrow">▸</span>
       </button>
+      <div id="advanced-section" class="hidden" style="margin-top:12px;display:flex;flex-direction:column;gap:16px">
+        <div class="form-group">
+          <label>Repositorio existente <span style="font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span></label>
+          <input type="text" id="input-repo" placeholder="https://github.com/org/repo.git" autocomplete="off" />
+          <span class="form-hint">Si ya tenés el código en GitHub/GitLab, pegá la URL acá. Si lo dejás vacío, se crea un repositorio nuevo automáticamente.</span>
+        </div>
+        <div class="form-group">
+          <label>Otras API Keys</label>
+          <span class="form-hint" style="margin-bottom:6px">Agregá otras claves que necesite el proyecto (OpenAI, etc).</span>
+          <div class="api-keys-section" id="api-keys-list"></div>
+          <button class="btn btn-ghost btn-sm" style="margin-top:6px;align-self:flex-start" onclick="addApiKeyRow()">+ Agregar key</button>
+        </div>
+      </div>
     </div>
 
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeNewProjectModal()">Cancelar</button>
-      <button class="btn btn-primary" id="btn-create" onclick="createProject()">
-        Crear proyecto
-      </button>
+      <button class="btn btn-primary" id="btn-create" onclick="createProject()">Crear proyecto</button>
     </div>
   </div>
 </div>
@@ -513,7 +512,6 @@
     loadProjects()
     // Refrescar cada 30s
     setInterval(loadProjects, 30000)
-    addApiKeyRow() // Fila inicial de API key
   })
 
   // ── Vistas ──────────────────────────────────────────────────────────────────
@@ -522,11 +520,8 @@
     event.currentTarget.classList.add('active')
 
     document.getElementById('view-projects').classList.toggle('hidden', name !== 'projects')
-    document.getElementById('view-attach').classList.toggle('hidden', name !== 'attach')
     document.getElementById('btn-new-project').classList.toggle('hidden', name !== 'projects')
-    document.getElementById('view-title').textContent = name === 'projects' ? 'Proyectos' : 'Conectar TUI'
-
-    if (name === 'attach') renderAttachView()
+    document.getElementById('view-title').textContent = 'Proyectos'
   }
 
   // ── Cargar proyectos ────────────────────────────────────────────────────────
@@ -566,22 +561,12 @@
         : null
 
       const urlRow = projectUrl
-        ? `<div class="project-url">
-            <span>${projectUrl}</span>
-            <button class="copy-btn" title="Copiar URL" onclick="copyText('${projectUrl}')">⎘</button>
-          </div>`
+        ? `<a href="${projectUrl}" target="_blank" class="btn btn-primary" style="text-decoration:none;justify-content:center">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Abrir OpenCode
+          </a>`
         : ''
-
-      const attachCmd = p.running && p.port
-        ? `opencode attach ${projectUrl}`
-        : null
-
-      const attachRow = attachCmd
-        ? `<div class="project-url" style="color:var(--text-muted)">
-            <span>${attachCmd}</span>
-            <button class="copy-btn" title="Copiar comando" onclick="copyText('${attachCmd}')">⎘</button>
-          </div>`
-        : ''
+      const attachRow = ''
 
       const createdAt = p.createdAt
         ? new Date(p.createdAt).toLocaleDateString('es-AR', { day:'2-digit', month:'short', year:'numeric' })
@@ -617,58 +602,30 @@
     }).join('')
   }
 
-  // ── Vista Attach ─────────────────────────────────────────────────────────────
-  function renderAttachView() {
-    const list  = document.getElementById('attach-projects-list')
-    const empty = document.getElementById('attach-empty')
-    const active = projects.filter(p => p.running)
-
-    if (active.length === 0) {
-      list.innerHTML = ''
-      empty.classList.remove('hidden')
-      return
-    }
-
-    empty.classList.add('hidden')
-    list.innerHTML = active.map(p => {
-      const url = `${TUNNEL_URL}/p/${p.name}/`
-      const cmd = `opencode attach ${url}`
-      return `
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:10px">
-          <div style="font-weight:600;font-family:var(--mono);color:var(--accent)">${p.name}</div>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Comando para conectar</span>
-            <div class="project-url">
-              <span>${cmd}</span>
-              <button class="copy-btn" title="Copiar" onclick="copyText('${cmd}')">⎘</button>
-            </div>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Abrir en browser</span>
-            <div class="project-url">
-              <span>${url}</span>
-              <button class="copy-btn" title="Copiar" onclick="copyText('${url}')">⎘</button>
-            </div>
-          </div>
-        </div>
-      `
-    }).join('')
-  }
-
   // ── Nuevo proyecto modal ─────────────────────────────────────────────────────
   function openNewProjectModal() {
     document.getElementById('modal-new-project').classList.remove('hidden')
     document.getElementById('input-name').focus()
   }
 
+  function toggleAdvanced() {
+    const section = document.getElementById('advanced-section')
+    const arrow = document.getElementById('advanced-arrow')
+    const hidden = section.classList.toggle('hidden')
+    arrow.textContent = hidden ? '▸' : '▾'
+  }
+
   function closeNewProjectModal() {
     document.getElementById('modal-new-project').classList.add('hidden')
     document.getElementById('input-name').value = ''
+    document.getElementById('input-description').value = ''
     document.getElementById('input-repo').value = ''
     document.getElementById('input-creator').value = ''
+    document.getElementById('input-anthropic-key').value = ''
     document.getElementById('api-keys-list').innerHTML = ''
+    document.getElementById('advanced-section').classList.add('hidden')
+    document.getElementById('advanced-arrow').textContent = '▸'
     apiKeyCount = 0
-    addApiKeyRow()
   }
 
   function addApiKeyRow() {
@@ -702,13 +659,18 @@
   }
 
   async function createProject() {
-    const name      = document.getElementById('input-name').value.trim()
-    const repo      = document.getElementById('input-repo').value.trim()
-    const createdBy = document.getElementById('input-creator').value.trim()
-    const apiKeys   = collectApiKeys()
+    const name        = document.getElementById('input-name').value.trim()
+    const description = document.getElementById('input-description').value.trim()
+    const repo        = document.getElementById('input-repo').value.trim()
+    const createdBy   = document.getElementById('input-creator').value.trim()
+    const anthropicKey = document.getElementById('input-anthropic-key').value.trim()
+    const extraKeys   = collectApiKeys()
+
+    const apiKeys = {}
+    if (anthropicKey) apiKeys['ANTHROPIC_API_KEY'] = anthropicKey
+    Object.assign(apiKeys, extraKeys)
 
     if (!name) return toast('El nombre es obligatorio', 'error')
-    if (!repo)  return toast('La URL del repositorio es obligatoria', 'error')
 
     const btn = document.getElementById('btn-create')
     btn.disabled = true
@@ -718,13 +680,11 @@
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, repo, apiKeys, createdBy })
+        body: JSON.stringify({ name, description, repo: repo || undefined, apiKeys, createdBy })
       })
       const data = await res.json()
-
       if (!res.ok) throw new Error(data.error || 'Error desconocido')
-
-      toast(`Proyecto "${data.name}" creado y corriendo en puerto ${data.port}`, 'success')
+      toast(`Proyecto "${data.name}" creado correctamente`, 'success')
       closeNewProjectModal()
       await loadProjects()
     } catch (err) {
