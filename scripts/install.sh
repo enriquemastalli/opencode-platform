@@ -4,9 +4,11 @@ set -euo pipefail
 # ── OpenCode Platform — Script de instalación para VPS Ubuntu 24.04 ──────────
 # Uso one-liner:
 #   bash <(curl -fsSL https://raw.githubusercontent.com/enriquemastalli/opencode-platform/main/scripts/install.sh)
-# Requiere: Ubuntu 24.04, acceso root/sudo, CLOUDFLARE_TUNNEL_TOKEN configurado
+# Requiere: Ubuntu 24.04, acceso root/sudo
 
 REPO_URL="https://github.com/enriquemastalli/opencode-platform.git"
+INSTALL_DIR="/opt/opencode-platform"
+WORKSPACES_DIR="/workspaces"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -18,9 +20,6 @@ log()  { echo -e "${GREEN}[✓]${NC} $1"; }
 info() { echo -e "${BLUE}[→]${NC} $1"; }
 warn() { echo -e "${YELLOW}[!]${NC} $1"; }
 err()  { echo -e "${RED}[✗]${NC} $1"; exit 1; }
-
-INSTALL_DIR="/opt/opencode-platform"
-WORKSPACES_DIR="/workspaces"
 
 echo ""
 echo "╔══════════════════════════════════════╗"
@@ -67,22 +66,34 @@ else
   usermod -aG docker opencode
 fi
 
-# ── 5. Crear directorios ──────────────────────────────────────────────────────
-info "Creando directorios..."
-mkdir -p "$INSTALL_DIR"
-mkdir -p "$WORKSPACES_DIR"
+# ── 5. Clonar o actualizar el repositorio ────────────────────────────────────
+info "Instalando archivos de la plataforma..."
+if [[ -d "$INSTALL_DIR/.git" ]]; then
+  info "Repositorio ya existe, actualizando..."
+  git -C "$INSTALL_DIR" pull
+  log "Repositorio actualizado"
+else
+  # Preservar .env si ya existe
+  if [[ -f "$INSTALL_DIR/.env" ]]; then
+    cp "$INSTALL_DIR/.env" /tmp/opencode-platform.env.bak
+    warn ".env guardado en /tmp/opencode-platform.env.bak"
+  fi
+  rm -rf "$INSTALL_DIR"
+  git clone "$REPO_URL" "$INSTALL_DIR"
+  # Restaurar .env
+  if [[ -f /tmp/opencode-platform.env.bak ]]; then
+    cp /tmp/opencode-platform.env.bak "$INSTALL_DIR/.env"
+    log ".env restaurado"
+  fi
+  log "Repositorio clonado en $INSTALL_DIR"
+fi
 chown -R opencode:opencode "$INSTALL_DIR"
-chown -R opencode:opencode "$WORKSPACES_DIR"
-log "Directorios: $INSTALL_DIR y $WORKSPACES_DIR"
 
-# ── 6. Clonar repositorio ─────────────────────────────────────────────────────
-info "Clonando repositorio..."
-CLONE_DIR="$(mktemp -d)"
-git clone --depth=1 "$REPO_URL" "$CLONE_DIR"
-cp -r "$CLONE_DIR"/{docker-compose.yml,traefik,panel,opencode} "$INSTALL_DIR/"
-rm -rf "$CLONE_DIR"
-chown -R opencode:opencode "$INSTALL_DIR"
-log "Archivos instalados en $INSTALL_DIR"
+# ── 6. Crear directorio de workspaces ────────────────────────────────────────
+info "Creando directorios..."
+mkdir -p "$WORKSPACES_DIR"
+chown -R opencode:opencode "$WORKSPACES_DIR"
+log "Directorio de workspaces: $WORKSPACES_DIR"
 
 # ── 7. Configurar .env ────────────────────────────────────────────────────────
 ENV_FILE="$INSTALL_DIR/.env"
@@ -93,8 +104,8 @@ if [[ ! -f "$ENV_FILE" ]]; then
     echo ""
     warn "Necesitás el token del Cloudflare Tunnel."
     echo "  1. Ve a Cloudflare Zero Trust → Networks → Tunnels"
-    echo "  2. Crea un tunnel nuevo, elige 'cloudflared'"
-    echo "  3. Copia el token que aparece en el comando de instalación"
+    echo "  2. Crea un tunnel nuevo, elige 'Docker'"
+    echo "  3. Copia el token que aparece en el comando (la parte después de --token)"
     echo ""
     read -rp "Pegá el token aquí: " CLOUDFLARE_TUNNEL_TOKEN
   fi
@@ -114,8 +125,7 @@ fi
 
 # ── 8. Construir imágenes Docker ──────────────────────────────────────────────
 info "Construyendo imágenes Docker (puede tardar unos minutos)..."
-cd "$INSTALL_DIR"
-docker compose build --no-cache
+docker compose -f "$INSTALL_DIR/docker-compose.yml" build --no-cache
 log "Imágenes construidas"
 
 # ── 9. Configurar firewall ────────────────────────────────────────────────────
@@ -124,14 +134,13 @@ ufw --force reset
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow ssh
-ufw allow 80/tcp   # Traefik (solo accesible via tunnel, pero necesario internamente)
+ufw allow 80/tcp
 ufw --force enable
 log "Firewall configurado (solo SSH + 80 internamente)"
 
 # ── 10. Arrancar la plataforma ────────────────────────────────────────────────
 info "Arrancando la plataforma..."
-cd "$INSTALL_DIR"
-docker compose up -d
+docker compose -f "$INSTALL_DIR/docker-compose.yml" up -d
 log "Plataforma arrancada"
 
 # ── 11. Configurar systemd para auto-arranque ─────────────────────────────────
@@ -169,17 +178,9 @@ echo "╔═══════════════════════�
 echo "║                   ¡Instalación completa!                     ║"
 echo "╠══════════════════════════════════════════════════════════════╣"
 echo "║                                                              ║"
-echo "║  Próximos pasos:                                             ║"
-echo "║                                                              ║"
-echo "║  1. Ve a Cloudflare Zero Trust → Networks → Tunnels          ║"
-echo "║     Configura la ruta pública del tunnel apuntando a:        ║"
-echo "║     http://traefik:80                                        ║"
-echo "║                                                              ║"
-echo "║  2. Activa Cloudflare Access para proteger el acceso:        ║"
-echo "║     Zero Trust → Access → Applications                       ║"
-echo "║     Crea una app y permite solo tu dominio de Google         ║"
-echo "║                                                              ║"
-echo "║  3. Compartí la URL del tunnel con tu equipo                 ║"
+echo "║  Para actualizar la plataforma en el futuro:                 ║"
+echo "║    cd /opt/opencode-platform && git pull                     ║"
+echo "║    docker compose up -d --build                              ║"
 echo "║                                                              ║"
 echo "║  Gestión:                                                    ║"
 echo "║    Ver logs:    docker compose -f ${INSTALL_DIR}/docker-compose.yml logs -f"
