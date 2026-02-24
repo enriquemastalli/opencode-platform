@@ -2,7 +2,7 @@ services:
 
   # ── Traefik — reverse proxy interno ────────────────────────────────────────
   traefik:
-    image: traefik:v3.2
+    image: traefik:v2.11
     container_name: traefik
     restart: unless-stopped
     volumes:
