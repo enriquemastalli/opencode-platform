@@ -19,9 +19,37 @@ const BASE_PORT = parseInt(process.env.OPENCODE_BASE_PORT || '4100', 10)
 const MAX_PROJECTS = parseInt(process.env.MAX_PROJECTS || '20', 10)
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || ''
 const GITHUB_ORG = process.env.GITHUB_ORG || 'essentia-uy'
+const PROVIDERS_FILE = path.join(WORKSPACES_DIR, '.providers.json')
 
 app.use(express.json())
 app.use(express.static(path.join(__dirname, 'public')))
+
+// ── Providers helpers ─────────────────────────────────────────────────────────
+
+function readProviders() {
+  if (!fs.existsSync(PROVIDERS_FILE)) return {}
+  try { return JSON.parse(fs.readFileSync(PROVIDERS_FILE, 'utf8')) } catch { return {} }
+}
+
+function writeProviders(data) {
+  fs.mkdirSync(path.dirname(PROVIDERS_FILE), { recursive: true })
+  fs.writeFileSync(PROVIDERS_FILE, JSON.stringify(data, null, 2))
+}
+
+// ── Catálogo de proveedores ───────────────────────────────────────────────────
+
+const PROVIDER_CATALOG = [
+  { id: 'anthropic',      name: 'Anthropic',        envKey: 'ANTHROPIC_API_KEY',            oauth: true,  description: 'Claude 3.5, Claude 4 y más modelos de Anthropic' },
+  { id: 'openai',         name: 'OpenAI',            envKey: 'OPENAI_API_KEY',               oauth: false, description: 'GPT-4o, GPT-4.1, o1 y todos los modelos de OpenAI' },
+  { id: 'google',         name: 'Google Gemini',     envKey: 'GOOGLE_GENERATIVE_AI_API_KEY', oauth: false, description: 'Gemini 2.5 Pro, Flash y modelos experimentales' },
+  { id: 'github-copilot', name: 'GitHub Copilot',    envKey: 'GITHUB_TOKEN',                 oauth: true,  description: 'Modelos Claude vía suscripción de GitHub Copilot' },
+  { id: 'openrouter',     name: 'OpenRouter',        envKey: 'OPENROUTER_API_KEY',           oauth: false, description: 'Accede a 200+ modelos desde un solo proveedor' },
+  { id: 'groq',           name: 'Groq',              envKey: 'GROQ_API_KEY',                 oauth: false, description: 'Inferencia ultrarrápida con LLaMA, Mixtral y más' },
+  { id: 'xai',            name: 'xAI (Grok)',        envKey: 'XAI_API_KEY',                  oauth: false, description: 'Grok 3 y modelos de xAI' },
+  { id: 'mistral',        name: 'Mistral',           envKey: 'MISTRAL_API_KEY',              oauth: false, description: 'Mistral Large, Codestral y modelos europeos' },
+  { id: 'deepseek',       name: 'DeepSeek',          envKey: 'DEEPSEEK_API_KEY',             oauth: false, description: 'DeepSeek V3, R1 — modelos de alto rendimiento' },
+  { id: 'opencode',       name: 'OpenCode Zen',      envKey: 'OPENCODE_API_KEY',             oauth: false, description: 'Modelos curados por el equipo de OpenCode' },
+]
 
 // ── GitHub API ────────────────────────────────────────────────────────────────
 
@@ -229,8 +257,20 @@ app.post('/api/projects', async (req, res) => {
     const git = simpleGit()
     await git.clone(cloneUrl, workspaceDir)
 
-    if (apiKeys && Object.keys(apiKeys).length > 0) {
-      const envContent = Object.entries(apiKeys)
+    // Combinar providers globales + API keys específicas del proyecto
+    const globalProviders = readProviders()
+    const allKeys = {}
+    // Primero los globales
+    for (const [pid, pdata] of Object.entries(globalProviders)) {
+      if (!pid.startsWith('_') && pdata.envKey && pdata.key) {
+        allKeys[pdata.envKey] = pdata.key
+      }
+    }
+    // Las keys específicas del proyecto sobreescriben las globales
+    if (apiKeys) Object.assign(allKeys, apiKeys)
+
+    if (Object.keys(allKeys).length > 0) {
+      const envContent = Object.entries(allKeys)
         .map(([k, v]) => `${k}=${v}`)
         .join('\n')
       fs.writeFileSync(path.join(workspaceDir, '.env'), envContent)
@@ -328,6 +368,128 @@ app.get('/api/projects/:name/logs', async (req, res) => {
     const logs = await container.logs({ stdout: true, stderr: true, tail: lines })
     const clean = logs.toString('utf8').replace(/[\x00-\x08\x0e-\x1f]/g, '')
     res.json({ logs: clean })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/providers — lista proveedores con estado
+app.get('/api/providers', (req, res) => {
+  const saved = readProviders()
+  const list = PROVIDER_CATALOG.map(p => ({
+    ...p,
+    connected: !!saved[p.id],
+    keyType: saved[p.id]?.type || null
+  }))
+  res.json(list)
+})
+
+// POST /api/providers/:id — conectar proveedor con API key
+app.post('/api/providers/:id', (req, res) => {
+  const { id } = req.params
+  const { apiKey } = req.body
+  const provider = PROVIDER_CATALOG.find(p => p.id === id)
+  if (!provider) return res.status(404).json({ error: 'Proveedor no encontrado' })
+  if (!apiKey) return res.status(400).json({ error: 'apiKey es obligatorio' })
+  const saved = readProviders()
+  saved[id] = { type: 'api', key: apiKey, envKey: provider.envKey, connectedAt: new Date().toISOString() }
+  writeProviders(saved)
+  res.json({ id, connected: true })
+})
+
+// DELETE /api/providers/:id — desconectar proveedor
+app.delete('/api/providers/:id', (req, res) => {
+  const { id } = req.params
+  const saved = readProviders()
+  delete saved[id]
+  writeProviders(saved)
+  res.json({ id, connected: false })
+})
+
+// GET /api/providers/copilot/oauth/start — GitHub Device Flow
+app.get('/api/providers/copilot/oauth/start', async (req, res) => {
+  try {
+    const data = await new Promise((resolve, reject) => {
+      const body = 'client_id=Ov23li8tweQw6odWQebz&scope=read%3Auser'
+      const options = {
+        hostname: 'github.com',
+        path: '/login/device/code',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+          'Content-Length': Buffer.byteLength(body)
+        }
+      }
+      const req2 = https.request(options, r => {
+        let raw = ''
+        r.on('data', c => raw += c)
+        r.on('end', () => { try { resolve(JSON.parse(raw)) } catch { reject(new Error('Parse error')) } })
+      })
+      req2.on('error', reject)
+      req2.write(body)
+      req2.end()
+    })
+    // Guardar device_code para polling
+    const polling = readProviders()
+    polling['_copilot_device'] = { device_code: data.device_code, interval: data.interval || 5 }
+    writeProviders(polling)
+    res.json({
+      user_code: data.user_code,
+      verification_uri: data.verification_uri,
+      expires_in: data.expires_in,
+      interval: data.interval
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/providers/copilot/oauth/poll — polling para obtener token
+app.post('/api/providers/copilot/oauth/poll', async (req, res) => {
+  const saved = readProviders()
+  const device = saved['_copilot_device']
+  if (!device) return res.status(400).json({ error: 'No hay autenticación pendiente' })
+
+  try {
+    const data = await new Promise((resolve, reject) => {
+      const body = `client_id=Ov23li8tweQw6odWQebz&device_code=${device.device_code}&grant_type=urn:ietf:params:oauth:grant-type:device_code`
+      const options = {
+        hostname: 'github.com',
+        path: '/login/oauth/access_token',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+          'Content-Length': Buffer.byteLength(body)
+        }
+      }
+      const req2 = https.request(options, r => {
+        let raw = ''
+        r.on('data', c => raw += c)
+        r.on('end', () => { try { resolve(JSON.parse(raw)) } catch { reject(new Error('Parse error')) } })
+      })
+      req2.on('error', reject)
+      req2.write(body)
+      req2.end()
+    })
+
+    if (data.error === 'authorization_pending') return res.json({ status: 'pending' })
+    if (data.error === 'slow_down') return res.json({ status: 'pending' })
+
+    if (data.access_token) {
+      const providers = readProviders()
+      providers['github-copilot'] = {
+        type: 'oauth',
+        key: data.access_token,
+        envKey: 'GITHUB_TOKEN',
+        connectedAt: new Date().toISOString()
+      }
+      delete providers['_copilot_device']
+      writeProviders(providers)
+      return res.json({ status: 'connected' })
+    }
+    res.json({ status: 'error', error: data.error_description || data.error })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

@@ -382,6 +382,44 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .hidden { display: none !important; }
+
+    /* ── Proveedores ── */
+    .providers-section { margin-bottom: 32px; }
+    .providers-section h3 { font-size: 12px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+
+    .provider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+    .provider-row:hover { border-color: #3a3a3a; }
+
+    .provider-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+      color: var(--text-muted);
+    }
+
+    .provider-info { flex: 1; min-width: 0; }
+    .provider-name { font-size: 13px; font-weight: 600; color: var(--text); }
+    .provider-desc { font-size: 11px; color: var(--text-muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .badge-api { background: rgba(59,130,246,0.12); color: var(--blue); }
+    .badge-oauth { background: rgba(34,197,94,0.12); color: var(--green); }
   </style>
 </head>
 <body>
@@ -393,9 +431,13 @@
       <h1>OpenCode</h1>
       <span>Platform</span>
     </div>
-    <div class="nav-item active" onclick="showView('projects')">
+    <div class="nav-item active" id="nav-projects" onclick="showView('projects', event)">
       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
       Proyectos
+    </div>
+    <div class="nav-item" id="nav-providers" onclick="showView('providers', event)">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      Proveedores
     </div>
     <div style="margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)">
       <a href="/cdn-cgi/access/logout" style="display:flex;align-items:center;gap:8px;color:var(--text-muted);font-size:12px;text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">
@@ -426,6 +468,22 @@
         <p>Creá tu primer proyecto con el botón de arriba. Solo necesitás el nombre y la URL del repositorio.</p>
       </div>
       <div id="projects-grid" class="projects-grid hidden"></div>
+    </div>
+
+    <!-- Vista: Proveedores -->
+    <div class="content hidden" id="view-providers">
+      <div style="max-width:640px">
+        <div class="providers-section" id="section-connected">
+          <h3>Proveedores conectados</h3>
+          <div id="providers-connected-list">
+            <div style="color:var(--text-muted);font-size:13px">Ningún proveedor conectado todavía.</div>
+          </div>
+        </div>
+        <div class="providers-section">
+          <h3>Proveedores disponibles</h3>
+          <div id="providers-available-list"></div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -486,6 +544,43 @@
   </div>
 </div>
 
+<!-- Modal: Conectar proveedor -->
+<div class="modal-overlay hidden" id="modal-connect-provider">
+  <div class="modal" style="max-width:440px">
+    <h2 id="connect-provider-title">Conectar proveedor</h2>
+
+    <div id="connect-api-section">
+      <div class="form-group">
+        <label id="connect-key-label">API Key</label>
+        <input type="password" id="input-provider-key" placeholder="sk-..." autocomplete="off" />
+        <span class="form-hint" id="connect-key-hint">Podés obtener tu clave en el sitio del proveedor.</span>
+      </div>
+    </div>
+
+    <div id="connect-oauth-section" class="hidden">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <p style="font-size:13px;color:var(--text-muted);line-height:1.6" id="connect-oauth-desc">
+          Para conectar via OAuth, seguí estos pasos:
+        </p>
+        <div id="oauth-code-block" class="hidden" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center">
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Tu código de verificación:</p>
+          <div id="oauth-user-code" style="font-size:28px;font-weight:700;font-family:var(--mono);letter-spacing:4px;color:var(--accent)"></div>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:8px">Abrí <strong id="oauth-verify-url"></strong> y pegá este código</p>
+        </div>
+        <div id="oauth-status" style="font-size:13px;color:var(--text-muted);text-align:center"></div>
+        <button class="btn btn-primary" id="btn-start-oauth" onclick="startOAuth()">
+          Iniciar autenticación
+        </button>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeConnectModal()">Cancelar</button>
+      <button class="btn btn-primary hidden" id="btn-save-provider" onclick="saveProviderKey()">Conectar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Logs -->
 <div class="modal-overlay hidden" id="modal-logs">
   <div class="modal" style="max-width:640px">
@@ -515,13 +610,19 @@
   })
 
   // ── Vistas ──────────────────────────────────────────────────────────────────
-  function showView(name) {
+  function showView(name, ev) {
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'))
-    event.currentTarget.classList.add('active')
+    if (ev) ev.currentTarget.classList.add('active')
+    else document.getElementById('nav-' + name)?.classList.add('active')
 
     document.getElementById('view-projects').classList.toggle('hidden', name !== 'projects')
+    document.getElementById('view-providers').classList.toggle('hidden', name !== 'providers')
     document.getElementById('btn-new-project').classList.toggle('hidden', name !== 'projects')
-    document.getElementById('view-title').textContent = 'Proyectos'
+
+    const titles = { projects: 'Proyectos', providers: 'Proveedores' }
+    document.getElementById('view-title').textContent = titles[name] || name
+
+    if (name === 'providers') loadProviders()
   }
 
   // ── Cargar proyectos ────────────────────────────────────────────────────────
@@ -770,8 +871,221 @@
     if (e.key === 'Escape') {
       closeNewProjectModal()
       closeLogs()
+      closeConnectModal()
     }
   })
+
+  // ── Proveedores ──────────────────────────────────────────────────────────────
+  let currentProviderId = null
+  let currentProviderOAuth = false
+  let oauthPollInterval = null
+
+  const PROVIDER_ICONS = {
+    'anthropic':      'A',
+    'openai':         'O',
+    'google':         'G',
+    'github-copilot': '⌥',
+    'openrouter':     'R',
+    'groq':           'Q',
+    'xai':            'X',
+    'mistral':        'M',
+    'deepseek':       'D',
+    'opencode':       'Z',
+  }
+
+  async function loadProviders() {
+    try {
+      const res = await fetch('/api/providers')
+      const providers = await res.json()
+      renderProviders(providers)
+    } catch (err) {
+      toast('Error cargando proveedores', 'error')
+    }
+  }
+
+  function renderProviders(providers) {
+    const connected = providers.filter(p => p.connected)
+    const available = providers.filter(p => !p.connected)
+
+    const connectedEl = document.getElementById('providers-connected-list')
+    const availableEl = document.getElementById('providers-available-list')
+
+    if (connected.length === 0) {
+      connectedEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:8px 0">Ningún proveedor conectado todavía.</div>'
+    } else {
+      connectedEl.innerHTML = connected.map(p => `
+        <div class="provider-row">
+          <div class="provider-icon">${PROVIDER_ICONS[p.id] || p.name[0]}</div>
+          <div class="provider-info">
+            <div class="provider-name">${p.name}</div>
+            <div class="provider-desc">${p.description}</div>
+          </div>
+          <span class="badge ${p.keyType === 'oauth' ? 'badge-oauth' : 'badge-api'}">${p.keyType === 'oauth' ? 'OAuth' : 'Clave API'}</span>
+          <button class="btn btn-ghost btn-sm" onclick="disconnectProvider('${p.id}')">Desconectar</button>
+        </div>
+      `).join('')
+    }
+
+    availableEl.innerHTML = available.map(p => `
+      <div class="provider-row">
+        <div class="provider-icon">${PROVIDER_ICONS[p.id] || p.name[0]}</div>
+        <div class="provider-info">
+          <div class="provider-name">${p.name}</div>
+          <div class="provider-desc">${p.description}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="openConnectModal('${p.id}', '${p.name}', ${p.oauth})">+ Conectar</button>
+      </div>
+    `).join('')
+  }
+
+  function openConnectModal(id, name, hasOAuth) {
+    currentProviderId = id
+    currentProviderOAuth = hasOAuth
+    document.getElementById('connect-provider-title').textContent = `Conectar ${name}`
+    document.getElementById('modal-connect-provider').classList.remove('hidden')
+
+    if (hasOAuth) {
+      // Mostrar opciones: OAuth o API key
+      document.getElementById('connect-api-section').innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px">
+          <button class="btn btn-ghost" style="justify-content:flex-start;gap:12px" onclick="switchConnectMode('api')">
+            <span style="font-size:16px">🔑</span>
+            <div style="text-align:left">
+              <div style="font-size:13px;font-weight:500;color:var(--text)">Pegar API Key</div>
+              <div style="font-size:11px;color:var(--text-muted)">Usá una clave de API generada en el sitio del proveedor</div>
+            </div>
+          </button>
+          <button class="btn btn-ghost" style="justify-content:flex-start;gap:12px" onclick="switchConnectMode('oauth')">
+            <span style="font-size:16px">🔐</span>
+            <div style="text-align:left">
+              <div style="font-size:13px;font-weight:500;color:var(--text)">Conectar con cuenta ${name}</div>
+              <div style="font-size:11px;color:var(--text-muted)">Usá tu suscripción existente sin crear una API key</div>
+            </div>
+          </button>
+        </div>
+      `
+      document.getElementById('connect-oauth-section').classList.add('hidden')
+      document.getElementById('btn-save-provider').classList.add('hidden')
+    } else {
+      document.getElementById('connect-api-section').innerHTML = `
+        <div class="form-group">
+          <label>API Key</label>
+          <input type="password" id="input-provider-key" placeholder="sk-..." autocomplete="off" />
+          <span class="form-hint">Podés obtener tu clave en el sitio del proveedor.</span>
+        </div>
+      `
+      document.getElementById('connect-oauth-section').classList.add('hidden')
+      document.getElementById('btn-save-provider').classList.remove('hidden')
+    }
+  }
+
+  function switchConnectMode(mode) {
+    if (mode === 'api') {
+      document.getElementById('connect-api-section').innerHTML = `
+        <div class="form-group">
+          <label>API Key</label>
+          <input type="password" id="input-provider-key" placeholder="sk-..." autocomplete="off" />
+          <span class="form-hint">Podés obtener tu clave en el sitio del proveedor.</span>
+        </div>
+      `
+      document.getElementById('connect-oauth-section').classList.add('hidden')
+      document.getElementById('btn-save-provider').classList.remove('hidden')
+    } else {
+      document.getElementById('connect-api-section').innerHTML = ''
+      document.getElementById('connect-oauth-section').classList.remove('hidden')
+      document.getElementById('btn-start-oauth').classList.remove('hidden')
+      document.getElementById('oauth-code-block').classList.add('hidden')
+      document.getElementById('oauth-status').textContent = ''
+      document.getElementById('btn-save-provider').classList.add('hidden')
+    }
+  }
+
+  async function startOAuth() {
+    if (currentProviderId !== 'github-copilot') return
+    const btn = document.getElementById('btn-start-oauth')
+    btn.disabled = true
+    btn.textContent = 'Iniciando...'
+
+    try {
+      const res = await fetch('/api/providers/copilot/oauth/start')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      document.getElementById('oauth-user-code').textContent = data.user_code
+      document.getElementById('oauth-verify-url').textContent = data.verification_uri
+      document.getElementById('oauth-code-block').classList.remove('hidden')
+      document.getElementById('oauth-status').textContent = 'Esperando autorización...'
+      btn.classList.add('hidden')
+
+      // Polling hasta autorización o timeout (60 intentos)
+      let attempts = 0
+      oauthPollInterval = setInterval(async () => {
+        attempts++
+        if (attempts > 60) {
+          clearInterval(oauthPollInterval)
+          document.getElementById('oauth-status').textContent = 'Tiempo agotado. Intentá de nuevo.'
+          return
+        }
+        try {
+          const pollRes = await fetch('/api/providers/copilot/oauth/poll', { method: 'POST' })
+          const pollData = await pollRes.json()
+          if (pollData.status === 'connected') {
+            clearInterval(oauthPollInterval)
+            toast('GitHub Copilot conectado correctamente', 'success')
+            closeConnectModal()
+            loadProviders()
+          } else if (pollData.status === 'error') {
+            clearInterval(oauthPollInterval)
+            document.getElementById('oauth-status').textContent = `Error: ${pollData.error}`
+          }
+        } catch {}
+      }, (data.interval || 5) * 1000)
+
+    } catch (err) {
+      toast(err.message, 'error')
+      btn.disabled = false
+      btn.textContent = 'Iniciar autenticación'
+    }
+  }
+
+  async function saveProviderKey() {
+    const keyInput = document.getElementById('input-provider-key')
+    const apiKey = keyInput?.value.trim()
+    if (!apiKey) return toast('Ingresá la API key', 'error')
+
+    try {
+      const res = await fetch(`/api/providers/${currentProviderId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast('Proveedor conectado', 'success')
+      closeConnectModal()
+      loadProviders()
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
+  async function disconnectProvider(id) {
+    if (!confirm('¿Desconectar este proveedor? Los proyectos existentes conservan sus keys guardadas.')) return
+    try {
+      const res = await fetch(`/api/providers/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Error al desconectar')
+      toast('Proveedor desconectado', 'success')
+      loadProviders()
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
+  function closeConnectModal() {
+    document.getElementById('modal-connect-provider').classList.add('hidden')
+    if (oauthPollInterval) { clearInterval(oauthPollInterval); oauthPollInterval = null }
+    currentProviderId = null
+  }
 </script>
 </body>
 </html>
