@@ -452,22 +452,24 @@
     <div class="form-group">
       <label>Nombre del proyecto</label>
       <input type="text" id="input-name" placeholder="mi-proyecto" autocomplete="off" />
-      <span class="form-hint">Solo letras minúsculas, números y guiones.</span>
+      <span class="form-hint">Un nombre corto para identificar este proyecto. Solo letras minúsculas, números y guiones. Ejemplo: <code style="background:var(--surface-2);padding:1px 4px;border-radius:3px;font-family:var(--mono)">essentia-web</code></span>
     </div>
 
     <div class="form-group">
       <label>URL del repositorio</label>
       <input type="text" id="input-repo" placeholder="https://github.com/org/repo.git" autocomplete="off" />
+      <span class="form-hint">La URL del repositorio de código que querés abrir con OpenCode. Tiene que ser público o usar un token de acceso.</span>
     </div>
 
     <div class="form-group">
       <label>Tu nombre (opcional)</label>
       <input type="text" id="input-creator" placeholder="Juan García" autocomplete="off" />
+      <span class="form-hint">Para saber quién creó el proyecto. No afecta el funcionamiento.</span>
     </div>
 
     <div class="form-group">
-      <label>API Keys</label>
-      <span class="form-hint" style="margin-bottom:6px">Se guardan en el servidor solo para este proyecto. Agregá las que necesites.</span>
+      <label>API Keys del agente de IA</label>
+      <span class="form-hint" style="margin-bottom:6px">Las claves que OpenCode va a usar para conectarse a los modelos de IA (Anthropic, OpenAI, etc). Se guardan de forma segura en el servidor y solo se usan para este proyecto.</span>
       <div class="api-keys-section" id="api-keys-list">
         <!-- filas dinámicas -->
       </div>
@@ -676,8 +678,8 @@
     row.className = 'api-key-row'
     row.id = `key-row-${id}`
     row.innerHTML = `
-      <input type="text" placeholder="ANTHROPIC_API_KEY" data-type="key" />
-      <input type="password" placeholder="sk-ant-..." data-type="value" />
+      <input type="text" placeholder="Nombre (ej: ANTHROPIC_API_KEY)" data-type="key" />
+      <input type="password" placeholder="Valor (ej: sk-ant-...)" data-type="value" />
       <button class="btn btn-ghost btn-sm" onclick="removeApiKeyRow(${id})" style="padding:4px 8px">✕</button>
     `
     list.appendChild(row)
