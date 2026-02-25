@@ -24,11 +24,10 @@ const db = new sqlite3.Database(dbPath, (err) => {
         console.error('Error opening database', err.message);
     } else {
         console.log('Connected to the SQLite database.');
-        initDb();
     }
 });
 
-function initDb() {
+const initPromise = new Promise((resolve, reject) => {
     db.serialize(() => {
         // Configuration table
         db.run(`CREATE TABLE IF NOT EXISTS config (
@@ -50,35 +49,42 @@ function initDb() {
         db.get(`SELECT value FROM config WHERE key = 'status'`, (err, row) => {
             if (err) {
                 console.error('Error querying config', err);
+                reject(err);
             } else if (!row) {
-                db.run(`INSERT INTO config (key, value) VALUES ('status', 'UNCONFIGURED')`);
+                db.run(`INSERT INTO config (key, value) VALUES ('status', 'UNCONFIGURED')`, (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                });
+            } else {
+                resolve();
             }
         });
     });
-}
+});
 
 function getConfig(key) {
-    return new Promise((resolve, reject) => {
+    return initPromise.then(() => new Promise((resolve, reject) => {
         db.get(`SELECT value FROM config WHERE key = ?`, [key], (err, row) => {
             if (err) reject(err);
             else resolve(row ? row.value : null);
         });
-    });
+    }));
 }
 
 function setConfig(key, value) {
-    return new Promise((resolve, reject) => {
+    return initPromise.then(() => new Promise((resolve, reject) => {
         db.run(`INSERT INTO config (key, value) VALUES (?, ?) 
                 ON CONFLICT(key) DO UPDATE SET value=excluded.value`, 
                 [key, value], (err) => {
             if (err) reject(err);
             else resolve();
         });
-    });
+    }));
 }
 
 module.exports = {
     db,
     getConfig,
-    setConfig
+    setConfig,
+    initPromise
 };
