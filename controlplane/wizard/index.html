@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenCode Platform - Setup Wizard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f4f5;
+            color: #18181b;
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            width: 100%;
+            max-width: 600px;
+            padding: 2rem;
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #e4e4e7;
+            padding-bottom: 1rem;
+        }
+        .step {
+            display: none;
+        }
+        .step.active {
+            display: block;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+        input[type="text"], input[type="password"], select {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #d4d4d8;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        .help-text {
+            font-size: 0.875rem;
+            color: #71717a;
+            margin-top: 0.25rem;
+        }
+        .actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e4e4e7;
+        }
+        button {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            background-color: #2563eb;
+            color: white;
+            font-weight: 500;
+        }
+        button:disabled {
+            background-color: #a1a1aa;
+            cursor: not-allowed;
+        }
+        button.secondary {
+            background-color: white;
+            color: #18181b;
+            border: 1px solid #d4d4d8;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>OpenCode Platform Setup</h1>
+    
+    <form id="wizard-form">
+        <!-- Step 1: Domain -->
+        <div class="step active" id="step-1">
+            <h2>1. Company Domain</h2>
+            <p>Configure the corporate domain where OpenCode will be hosted.</p>
+            
+            <div class="form-group">
+                <label for="domain">Corporate Domain</label>
+                <input type="text" id="domain" name="domain" placeholder="e.g. empresa.com" required>
+                <div class="help-text">OpenCode will be available at opencode.[your-domain].</div>
+            </div>
+        </div>
+
+        <!-- Step 2: Cloudflare -->
+        <div class="step" id="step-2">
+            <h2>2. Cloudflare API</h2>
+            <p>We need access to Cloudflare to configure DNS and Tunnels.</p>
+            
+            <div class="form-group">
+                <label for="cf_account_id">Cloudflare Account ID</label>
+                <input type="text" id="cf_account_id" name="cf_account_id" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="cf_api_token">Cloudflare API Token</label>
+                <input type="password" id="cf_api_token" name="cf_api_token" required>
+                <div class="help-text">Requires Zone.DNS, Account.Cloudflare Tunnel, and Account.Access permissions.</div>
+            </div>
+        </div>
+
+        <!-- Step 3: Zero Trust -->
+        <div class="step" id="step-3">
+            <h2>3. Zero Trust Access</h2>
+            <p>Restrict access to users matching your corporate email domains.</p>
+            
+            <div class="form-group">
+                <label for="idp_type">Identity Provider (IdP)</label>
+                <select id="idp_type" name="idp_type">
+                    <option value="google">Google Workspace</option>
+                    <option value="entra">Microsoft Entra ID</option>
+                    <option value="okta">Okta</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="allowed_domains">Allowed Email Domains (Comma separated)</label>
+                <input type="text" id="allowed_domains" name="allowed_domains" placeholder="e.g. empresa.com, filial.com" required>
+            </div>
+        </div>
+
+        <!-- Step 4: GitHub -->
+        <div class="step" id="step-4">
+            <h2>4. GitHub Integration</h2>
+            <p>Connect the base repository where work will be performed.</p>
+            
+            <div class="form-group">
+                <label for="gh_token">GitHub PAT (Personal Access Token)</label>
+                <input type="password" id="gh_token" name="gh_token" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="gh_repo">Repository (Owner/Repo)</label>
+                <input type="text" id="gh_repo" name="gh_repo" placeholder="e.g. essentia-uy/opencode-platform" required>
+            </div>
+        </div>
+
+        <!-- Step 5: Providers -->
+        <div class="step" id="step-5">
+            <h2>5. AI Model Providers</h2>
+            <p>Configure the API keys for the AI models.</p>
+            
+            <div class="form-group">
+                <label for="anthropic_key">Anthropic API Key (Claude)</label>
+                <input type="password" id="anthropic_key" name="anthropic_key">
+            </div>
+            
+            <div class="form-group">
+                <label for="openai_key">OpenAI API Key (GPT-4)</label>
+                <input type="password" id="openai_key" name="openai_key">
+            </div>
+        </div>
+
+        <!-- Step 6: Finish -->
+        <div class="step" id="step-6">
+            <h2>6. Ready to Configure</h2>
+            <p>Click Finish to apply the configuration. This will:</p>
+            <ul>
+                <li>Create Cloudflare DNS & Tunnel</li>
+                <li>Setup Zero Trust Policies</li>
+                <li>Clone the GitHub repository</li>
+                <li>Start OpenCode Web securely</li>
+            </ul>
+        </div>
+
+        <div class="actions">
+            <button type="button" id="btn-prev" class="secondary" disabled>Previous</button>
+            <button type="button" id="btn-next">Next</button>
+            <button type="submit" id="btn-submit" style="display: none;">Finish Setup</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    const steps = document.querySelectorAll('.step');
+    let currentStep = 0;
+    
+    const btnNext = document.getElementById('btn-next');
+    const btnPrev = document.getElementById('btn-prev');
+    const btnSubmit = document.getElementById('btn-submit');
+    const form = document.getElementById('wizard-form');
+
+    function updateView() {
+        steps.forEach((el, index) => {
+            el.classList.toggle('active', index === currentStep);
+        });
+        
+        btnPrev.disabled = currentStep === 0;
+        
+        if (currentStep === steps.length - 1) {
+            btnNext.style.display = 'none';
+            btnSubmit.style.display = 'block';
+        } else {
+            btnNext.style.display = 'block';
+            btnSubmit.style.display = 'none';
+        }
+    }
+
+    btnNext.addEventListener('click', () => {
+        // Basic validation before next
+        const currentInputs = steps[currentStep].querySelectorAll('input[required], select[required]');
+        let valid = true;
+        currentInputs.forEach(input => {
+            if (!input.value) {
+                valid = false;
+                input.style.borderColor = 'red';
+            } else {
+                input.style.borderColor = '#d4d4d8';
+            }
+        });
+        
+        if (valid && currentStep < steps.length - 1) {
+            currentStep++;
+            updateView();
+        }
+    });
+
+    btnPrev.addEventListener('click', () => {
+        if (currentStep > 0) {
+            currentStep--;
+            updateView();
+        }
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        btnSubmit.disabled = true;
+        btnSubmit.innerText = 'Configuring...';
+        
+        const formData = new FormData(form);
+        const payload = Object.fromEntries(formData.entries());
+        
+        try {
+            const res = await fetch('/api/configure', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            if (res.ok) {
+                alert('Configuration started successfully! The system will be ready shortly.');
+                // Redirect to root after a few seconds, which will eventually proxy to OpenCode
+                setTimeout(() => window.location.href = '/', 3000);
+            } else {
+                const data = await res.json();
+                alert('Error: ' + data.error);
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = 'Finish Setup';
+            }
+        } catch (err) {
+            alert('Connection error');
+            btnSubmit.disabled = false;
+            btnSubmit.innerText = 'Finish Setup';
+        }
+    });
+</script>
+
+</body>
+</html>

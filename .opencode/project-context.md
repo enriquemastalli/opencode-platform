@@ -1,140 +1,340 @@
-# OpenCode Platform — Project Context
+# PROJECT CONTEXT — OpenCode Desktop Orchestrated Team Workspace (VPS + Cloudflare + GitHub + Zero Trust by Company Domain)
 
-## Qué es esto
+## 0) North Star
+Implementar un **entorno web colaborativo** basado en OpenCode, instalado en un **VPS**, administrado desde una **consola web** (wizard) que, en el primer arranque, detecta que “no hay nada configurado” y **orquesta la configuración completa del ecosistema**:
 
-Plataforma de gestión centralizada que permite al equipo interno de Essentia lanzar y conectarse a instancias de `opencode` corriendo en un VPS compartido. Cada miembro del equipo puede crear un proyecto (clonar un repo de GitHub/GitLab), y obtener una URL pública para usar opencode desde el browser o hacer `opencode attach` desde su máquina local con el TUI completo.
+- Cloudflare (DNS + Tunnel)
+- Cloudflare Zero Trust (Access) **permitiendo acceso por dominio corporativo**, no por lista fija de emails
+- GitHub (repositorio, acceso, y flujo de trabajo)
+- Proveedores y modelos (OpenAI / Anthropic / Groq / Gemini / etc.)
+- Estructura de workspaces aislados por tarea mediante **git worktrees**
+- Sin Docker / sin devcontainers (arquitectura simple)
 
-## Problema que resuelve
+**Regla de oro:** “Instalo todo en el VPS; la configuración fina ocurre desde la administración web”.
 
-Sin esta plataforma, cada colaborador necesita:
-- Instalar opencode localmente
-- Gestionar sus propias API keys
-- Tener el repo clonado en su máquina
+---
 
-Con esta plataforma:
-- El código y los agentes corren en el servidor
-- Cada usuario accede via browser o TUI remoto
-- Las API keys se guardan por proyecto en el servidor
-- El acceso está protegido por Cloudflare Access (Google Workspace)
+## 1) Componentes del sistema
 
-## Arquitectura
+### 1.1 VPS Layer (infra mínima)
+- Ubuntu LTS
+- Node LTS + npm
+- OpenCode instalado por npm
+- cloudflared instalado (paquete oficial)
+- UFW activo (solo SSH; nada de 80/443/8080 públicos)
+- systemd services:
+  - `opencode.service`
+  - `cloudflared.service`
+  - `controlplane.service` (nuevo: consola + wizard + proxy)
 
-```
-Internet → Cloudflare Tunnel → Traefik (proxy) → Panel de gestión
-                                               → opencode-proyecto-a (opencode web)
-                                               → opencode-proyecto-b (opencode web)
-                                               → opencode-proyecto-N ...
-```
+### 1.2 Control Plane (nuevo, obligatorio)
+Una aplicación web liviana (Node) que:
+- Expone la **administración web** y el **wizard**
+- Persiste estado de configuración (SQLite mínimo)
+- Integra API de Cloudflare (DNS / Tunnel / Access Apps / Policies / IdP reference)
+- Integra API de GitHub (tokens, repo validation, cloning strategy, opcional webhooks)
+- Gestiona la configuración de providers/modelos (validación + guardado seguro)
+- Hace **reverse-proxy** hacia OpenCode Web una vez que el sistema está “READY”
+- En modo “UNCONFIGURED” intercepta y manda al wizard (`/setup`)
 
-- **Cloudflare Tunnel**: expone el VPS sin abrir puertos al mundo. Cloudflare Access restringe el acceso a emails del equipo (@dominio.com via Google OAuth).
-- **Traefik**: reverse proxy interno que enruta `/p/<nombre>/` a cada contenedor de opencode.
-- **Panel de gestión**: app Node.js + HTML que permite crear/listar/start/stop/eliminar proyectos. Cada proyecto = un contenedor Docker con `opencode web`.
-- **Workspaces**: los repos se clonan en `/workspaces/<nombre>/` del VPS y se montan como volumen en el contenedor.
+> OpenCode no “trae” este wizard. Se implementa como capa encima.
 
-## Stack técnico
+---
 
-| Capa | Tecnología |
-|------|-----------|
-| VPS | Ubuntu 24.04 en DigitalOcean |
-| Contenerización | Docker + Docker Compose |
-| Proxy interno | Traefik v3 |
-| Zero Trust / Auth | Cloudflare Tunnel + Cloudflare Access |
-| Panel backend | Node.js 22 + Express + Dockerode |
-| Panel frontend | HTML + JS puro (sin framework) |
-| Imagen opencode | node:22-slim + opencode-ai npm global |
+## 2) Experiencia objetivo (User Journey)
 
-## Estructura del proyecto
+### 2.1 Primera vez (ideal)
+1) Admin abre el panel (URL temporal o por túnel básico de bootstrap)
+2) El sistema detecta `STATUS=UNCONFIGURED`
+3) Redirige a `/setup`
+4) Wizard pregunta lo mínimo, valida, configura por API y aplica cambios
+5) Al finalizar:
+   - se crea `opencode.<dominio_empresa>`
+   - se configura Zero Trust para autenticar con IdP corporativo
+   - se activa policy: **email ends with @empresa.com** (y opcionalmente lista de dominios)
+   - se configura GitHub repo base
+   - se configuran providers/modelos
+   - se marca `STATUS=READY`
+6) Admin reingresa por `opencode.<dominio_empresa>` ya con Zero Trust activo.
 
-```
-opencode-platform/
-├── docker-compose.yml          # Traefik + Panel + Cloudflared
-├── traefik/traefik.yml         # Config estática de Traefik (sin TLS, lo maneja CF)
-├── opencode/Dockerfile         # Imagen base: node:22-slim + opencode-ai
-├── panel/
-│   ├── Dockerfile              # node:22-slim
-│   ├── package.json            # express, dockerode, simple-git, dotenv
-│   ├── server.js               # API REST completa de gestión de proyectos
-│   └── public/index.html       # UI del panel (dark mode, estilo opencode)
-├── scripts/install.sh          # Setup completo del VPS en un comando
-├── .env.example                # Variables requeridas
-└── .gitignore
-```
+### 2.2 Operación diaria
+- Usuarios entran por `opencode.<dominio_empresa>`
+- Cloudflare Access autentica con el IdP corporativo
+- El Control Plane deja pasar y proxya a OpenCode
+- Trabajo aislado por **worktrees** por tarea/usuario
+- Merge por PR en GitHub
+- Limpieza de worktrees
 
-## API del panel
+---
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/api/projects` | Lista proyectos con estado |
-| POST | `/api/projects` | Crea proyecto (clona repo + levanta contenedor) |
-| POST | `/api/projects/:name/start` | Inicia proyecto detenido |
-| POST | `/api/projects/:name/stop` | Detiene proyecto |
-| DELETE | `/api/projects/:name` | Elimina proyecto (workspace + contenedor) |
-| GET | `/api/projects/:name/logs` | Últimas líneas de logs del contenedor |
-| GET | `/api/health` | Health check |
+## 3) Requisito clave: Zero Trust por dominio corporativo
 
-## Flujo de un proyecto nuevo
+### 3.1 No se permite “lista fija de 6”
+El acceso debe basarse en dominio(s) corporativo(s), por ejemplo:
+- `@empresa.com`
+- opcional: múltiples dominios (holding): `@empresa.com` OR `@empresa.net`
 
-1. Usuario entra al panel (URL pública del tunnel, autenticado con Google)
-2. Click "Nuevo proyecto" → ingresa nombre, URL del repo, API keys
-3. El panel: clona el repo en `/workspaces/<nombre>/`, crea `.env` con las keys, levanta contenedor `opencode web` con Traefik labels
-4. Traefik detecta el contenedor nuevo y enruta `/p/<nombre>/` automáticamente
-5. Usuario recibe URL pública y comando `opencode attach`
+### 3.2 Login “por el dominio de la empresa”
+Se interpreta como:
+- Autenticación mediante **IdP corporativo** (Google Workspace / Entra ID / Okta / etc.)
+- Política Access que permita usuarios cuyo email **termina en** uno de los dominios configurados
 
-## Cómo conectarse a un proyecto
+**Obligatorio en wizard:**
+- Seleccionar tipo de IdP (mínimo: Google Workspace o Entra ID)
+- Registrar/usar ese IdP en Cloudflare Zero Trust (si no existe, asistir)
+- Crear Access Application para `opencode.<dominio>`
+- Crear policy Include por `email ends with`
 
-**Desde el browser:**
-```
-https://<tunnel>.cfargotunnel.com/p/<nombre>/
-```
+---
 
-**Desde el TUI local:**
-```bash
-opencode attach https://<tunnel>.cfargotunnel.com/p/<nombre>/
-```
+## 4) Requisito clave: Instalación 100% automática en VPS
 
-## Variables de entorno (.env en el VPS)
+### 4.1 Script obligatorio
+El agente debe generar y mantener:
+- `install_vps.sh` (one-shot)
+- Idempotente (correr 2 veces no rompe)
+- Logs en: `/var/log/opencode-install.log`
+- No hardcodear secretos (solo env vars / archivo `.env` fuera del repo)
+- Instala:
+  - Node LTS + npm
+  - OpenCode via npm
+  - cloudflared
+  - Control Plane
+  - systemd services
+  - UFW (solo SSH)
 
-```
-CLOUDFLARE_TUNNEL_TOKEN=eyJ...   # Token del tunnel de Cloudflare
-WORKSPACES_DIR=/workspaces        # Directorio de workspaces en el VPS
-OPENCODE_BASE_PORT=4100           # Puerto inicial para contenedores
-MAX_PROJECTS=20                   # Máximo de proyectos simultáneos
-```
+### 4.2 Bootstrap “sin configurar”
+El script deja el sistema funcionando en modo:
+- `UNCONFIGURED`
+- con un acceso temporal de bootstrap (ver sección 5)
 
-## Comandos útiles en el VPS
+---
 
-```bash
-# Ver estado de todos los servicios
-docker compose -f /opt/opencode-platform/docker-compose.yml ps
+## 5) Bootstrap de acceso antes de Zero Trust (problema real y solución)
+Para poder correr el wizard, al principio **todavía no existe** `opencode.<dominio>` ni Access.
 
-# Ver logs del panel
-docker compose -f /opt/opencode-platform/docker-compose.yml logs -f panel
+### 5.1 Solución recomendada (simple y segura)
+- El script crea un **túnel bootstrap** a un hostname temporal (ej: `opencode-setup.<dominio-controlado>` o un subdominio controlado por nosotros)
+- O alternativa: acceso solo por SSH + `cloudflared tunnel --url` temporal
+- El wizard luego migra a `opencode.<dominio_empresa>`
 
-# Ver logs de un proyecto específico
-docker logs opencode-project-<nombre> -f
+**Regla:** el bootstrap debe expirar o deshabilitarse al pasar a `READY`.
 
-# Reiniciar toda la plataforma
-systemctl restart opencode-platform
+---
 
-# Listar proyectos activos
-docker ps --filter "name=opencode-project-"
-```
+## 6) Configuración por API (no manual)
 
-## Decisiones de diseño
+### 6.1 Cloudflare
+El Control Plane debe usar Cloudflare API para:
+- Verificar que el dominio está en la cuenta Cloudflare indicada
+- Crear Tunnel (si no existe)
+- Crear/actualizar DNS record `opencode.<dominio_empresa>` hacia Tunnel
+- Configurar cloudflared (credenciales + config.yml) y reiniciar servicio
 
-- **Sin TLS en Traefik**: Cloudflare Tunnel ya termina TLS externamente. Traefik solo hace routing HTTP interno.
-- **Password por proyecto**: cada contenedor de opencode tiene su propia `OPENCODE_SERVER_PASSWORD` generada aleatoriamente. Se guarda en `.opencode-meta.json` del workspace.
-- **API keys por proyecto**: cada proyecto tiene su `.env` con las keys del usuario. Nunca se commitean al repo.
-- **node:22-slim**: usa Debian/glibc en vez de Alpine/musl porque el binario `workerd` de opencode requiere glibc.
-- **Dockerode**: el panel crea/gestiona contenedores directamente via Docker socket, sin scripts shell. Más robusto y portable.
-- **Sin base de datos**: el estado de los proyectos se persiste en el filesystem (`/workspaces/<nombre>/.opencode-meta.json`). Simple y sin dependencias adicionales.
+**Nunca depender de “abrí browser en el VPS y logueate”** como requisito final.
+Eso se acepta solo como bootstrap, no como diseño objetivo.
 
-## Pendiente / próximos pasos
+### 6.2 Zero Trust (Access)
+Por API:
+- Crear Access Application para `opencode.<dominio_empresa>`
+- Crear policy “Allow” por dominio(s) de email
+- Seleccionar IdP corporativo (o guiar su creación si aplica)
 
-- [ ] Configurar Cloudflare Tunnel en el dashboard (apuntar a `http://traefik:80`)
-- [ ] Activar Cloudflare Access con Google Workspace auth
-- [ ] Ejecutar `scripts/install.sh` en el VPS
-- [ ] Verificar routing de `opencode web` detrás de PathPrefix strip (puede necesitar ajuste si la UI usa paths absolutos)
-- [ ] Agregar autenticación al panel mismo (actualmente confía en Cloudflare Access como única capa)
-- [ ] Soporte para repos privados (SSH keys o GitHub token)
-- [ ] Notificaciones cuando un proyecto lleva más de X días sin actividad
+### 6.3 GitHub
+Por API:
+- Validar token y permisos
+- Validar repositorio
+- Configurar método de clonación (SSH recomendado; token HTTPS aceptable)
+- (Opcional) configurar webhook / checks si se quiere automatizar algo
+
+### 6.4 Model Providers
+- Guardar API keys cifradas o protegidas (mínimo: permisos 600 + no repo)
+- Validar conectividad (test prompt)
+- Guardar modelo default y fallback
+
+---
+
+## 7) Persistencia / Estado (State Machine)
+
+### 7.1 Estados
+- `UNCONFIGURED`
+- `CONFIGURING`
+- `READY`
+- `ERROR`
+
+### 7.2 Fuente de verdad
+- SQLite (mínimo) en `/srv/opencode/controlplane.db`
+- Config final “exportable” a `/etc/opencode/setup.json` (read-only para servicios)
+
+### 7.3 Reglas
+- Si `UNCONFIGURED` => toda request al root redirige a `/setup`
+- Si `READY` => root proxya a OpenCode Web
+- Si `ERROR` => mostrar diagnóstico + opción retry por paso
+
+---
+
+## 8) Aislamiento de trabajo: git worktrees (sin Docker)
+
+### 8.1 Regla
+- `main` no se toca
+- una tarea = un worktree
+- un usuario no comparte worktree
+- merge por PR
+
+### 8.2 Estructura en disco
+- Repo base: `/srv/repos/<project>`
+- Workspaces: `/srv/workspaces/<ticket>-<user>/`
+
+### 8.3 Scripts obligatorios
+El Control Plane debe generar o incluir:
+- `create_workspace.sh` (crea branch + worktree)
+- `remove_workspace.sh` (limpia worktree)
+- Opcional: endpoint web para crear/eliminar workspaces con roles/permisos
+
+---
+
+## 9) Seguridad
+
+### 9.1 Obligatorio
+- No exponer 80/443/8080 al público
+- Acceso externo solo por Cloudflare Tunnel
+- Zero Trust obligatorio para `READY`
+- SSH solo por key
+- Secrets fuera de repo
+- Permisos estrictos en `/etc/opencode/*.env` y DB
+
+### 9.2 Recomendado
+- Rotación de tokens
+- Backups diarios de:
+  - `/etc/opencode`
+  - `/srv/opencode/controlplane.db`
+  - `/srv/repos`
+- Logs con rotación
+
+---
+
+## 10) Archivos y rutas estándar (contract)
+
+### 10.1 VPS
+- `/srv/opencode/` (control plane + runtime)
+- `/srv/repos/`
+- `/srv/workspaces/`
+- `/etc/opencode/opencode.env` (variables runtime, 600)
+- `/etc/opencode/setup.json` (config final exportada, 600)
+- `/etc/cloudflared/config.yml`
+- `/var/log/opencode-install.log`
+
+### 10.2 Servicios systemd
+- `/etc/systemd/system/opencode.service`
+- `/etc/systemd/system/controlplane.service`
+- `cloudflared.service` (oficial)
+
+---
+
+## 11) Wizard — pasos (definición exacta)
+
+### Paso 1: Dominio de empresa
+Inputs:
+- `company_domain_dns` (ej: `empresa.com`)
+- Subdominio a usar (default fijo): `opencode`
+Resultado:
+- Hostname objetivo: `opencode.empresa.com`
+Validaciones:
+- El dominio está en Cloudflare account (o dar instrucciones claras)
+
+### Paso 2: Cloudflare API
+Inputs:
+- Cloudflare API token (scopes mínimos)
+- Account ID
+- Zone ID (si aplica; o deducir por API)
+Acciones:
+- Crear/asegurar tunnel
+- Crear/asegurar DNS record
+- Instalar credenciales y config
+- Reiniciar cloudflared
+Validación:
+- `opencode.empresa.com` responde con challenge/proxy (según etapa)
+
+### Paso 3: Zero Trust (Identity + Policy por dominio)
+Inputs:
+- Tipo de IdP: (Google Workspace / Entra / Okta / custom OIDC)
+- Dominios permitidos (lista): `empresa.com` (+ opcionales)
+Acciones:
+- Crear Access Application para hostname
+- Crear policy Allow: `email ends with @empresa.com` OR otros
+Validación:
+- request sin auth => redirect/login
+- request con auth del dominio => permite
+
+### Paso 4: GitHub
+Inputs:
+- Token (fine-grained o classic)
+- Owner/Org
+- Repo
+- Método de clonación (SSH recomendado)
+Acciones:
+- Validar token + acceso repo
+- Clonar repo a `/srv/repos/<project>`
+Validación:
+- `git fetch` OK
+
+### Paso 5: Model Providers
+Inputs:
+- Provider seleccionado
+- API key
+- Modelo default
+- Fallback (opcional)
+Acciones:
+- Test de completions
+- Guardar config
+Validación:
+- prueba pasa y persiste
+
+### Paso 6: Finalizar
+Acciones:
+- Export a `/etc/opencode/setup.json`
+- Set status READY
+- Deshabilitar bootstrap si existe
+- Reiniciar servicios
+Resultado:
+- acceso final por `opencode.empresa.com` con Zero Trust
+
+---
+
+## 12) No-negociables del agente (comportamiento)
+
+- No inventar valores sensibles
+- No hardcodear secretos en scripts o repo
+- Cada paso crítico debe:
+  1) verificar prerequisitos
+  2) ejecutar acción
+  3) validar
+  4) persistir estado
+- Preferir simplicidad operativa sobre “arquitecturas bonitas”
+- Mantener un “happy path” para 6 usuarios, escalable luego
+
+---
+
+## 13) Output esperado del agente (deliverables mínimos)
+1) `PROJECT_CONTEXT.md` (este documento)
+2) `install_vps.sh` (npm + infra + control plane)
+3) `controlplane/` (app Node) con:
+   - `/setup` wizard
+   - API clients Cloudflare + GitHub
+   - estado + persistencia
+   - reverse proxy hacia OpenCode
+4) `create_workspace.sh` + `remove_workspace.sh`
+5) systemd unit files generados por script
+
+---
+
+## 14) Definición de “done”
+- VPS instalado con un comando (script)
+- Admin abre panel, ve wizard
+- Configura dominio empresa (DNS)
+- Zero Trust autentica con IdP corporativo
+- Acceso permitido por dominio de email (no lista fija)
+- OpenCode accesible solo por `opencode.<dominio_empresa>`
+- Repos/worktrees funcionan
+- Providers/modelos funcionales
+- Bootstrap deshabilitado al final
